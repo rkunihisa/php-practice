@@ -1,0 +1,37 @@
+version: '3.8'  # Docker Composeファイルのバージョン指定
+
+services:
+  php:  # PHP＋Apacheのサービス（Webサーバー）
+    image: php:8.2-apache  # 公式PHP8.2＋Apacheイメージ使用
+    container_name: php-app  # コンテナ名指定（任意）
+    volumes:
+      - ./src:/var/www/html  # ホストのsrcフォルダをコンテナのWeb公開ディレクトリにマウント
+    ports:
+      - "8080:80"  # ホスト（PC）の8080番ポート→Apacheの80番ポートへ転送
+    depends_on:
+      - db  # MySQL（dbサービス）が起動してから立ち上がる
+
+  db:  # MySQLデータベースサーバー
+    image: mysql:8.0  # 公式MySQL8イメージ使用
+    container_name: mysql-db  # コンテナ名指定（任意）
+    environment:  # 環境変数で初期設定
+      MYSQL_ROOT_PASSWORD: rootpass  # rootユーザーのパスワード
+      MYSQL_DATABASE: formdb         # 自動作成されるデータベース名
+      MYSQL_USER: user              # 一般ユーザー名
+      MYSQL_PASSWORD: userpass      # 一般ユーザーのパスワード
+    ports:
+      - "3306:3306"  # ホストの3306番ポート→MySQL用
+    volumes:
+      - dbdata:/var/lib/mysql  # 永続化するボリューム名:MySQLのデータ格納場所
+
+  phpmyadmin:  # phpMyAdmin（MySQLをブラウザで管理）
+    image: phpmyadmin/phpmyadmin  # 公式phpMyAdminイメージ
+    container_name: myadmin  # コンテナ名指定（任意）
+    ports:
+      - "8081:80"  # ホスト（PC）の8081番→phpMyAdminの80番（Web画面）
+    environment:
+      PMA_HOST: db  # 接続するMySQLホスト名（dbサービス→同Compose内なのでこの名前）
+      MYSQL_ROOT_PASSWORD: rootpass  # rootパスワード（MySQLと揃える）
+
+volumes:
+  dbdata:  # MySQLデータ用の永続ボリューム定義
