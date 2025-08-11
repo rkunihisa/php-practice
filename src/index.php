@@ -1,4 +1,5 @@
 <?php
+phpinfo();
 echo '<!DOCTYPE html>';
 echo '<html lang="ja">';
 echo '<head>';

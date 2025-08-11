@@ -24,11 +24,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        // 問い合わせ内容確認（本来はここでDB保存やメール送信を行う）
-        $message = 'お問い合わせを受け付けました。<br>'
-                 . 'お名前：' . htmlspecialchars($name) . '<br>'
-                 . 'メールアドレス：' . htmlspecialchars($email) . '<br>'
-                 . '内容：<br>' . nl2br(htmlspecialchars($inquiry));
+        $dsn = 'mysql:host=db;dbname=formdb;charset=utf8mb4';
+        $db_user = 'user';
+        $db_pass = 'userpass';
+
+        try {
+            $pdo = new PDO($dsn, $db_user, $db_pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+
+            $stmt = $pdo->prepare("INSERT INTO contacts (name, email, inquiry) VALUES (?, ?, ?)");
+            $stmt->execute([$name, $email, $inquiry]);
+
+            $message = 'お問い合わせを受け付け、DBに保存しました。<br>'
+                     . 'お名前：' . htmlspecialchars($name) . '<br>'
+                     . 'メールアドレス：' . htmlspecialchars($email) . '<br>'
+                     . '内容：<br>' . nl2br(htmlspecialchars($inquiry));
+
+            // 登録後、フォーム欄の値リセット
+            $name = $email = $inquiry = '';
+        } catch (PDOException $e) {
+            $errors[] = 'データベースエラー: ' . htmlspecialchars($e->getMessage());
+        }
     }
 }
 ?>
