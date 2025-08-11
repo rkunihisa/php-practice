@@ -2,7 +2,7 @@ version: '3.8'  # Docker Composeファイルのバージョン指定
 
 services:
   php:  # PHP＋Apacheのサービス（Webサーバー）
-    image: php:8.2-apache  # 公式PHP8.2＋Apacheイメージ使用
+    build: .
     container_name: php-app  # コンテナ名指定（任意）
     volumes:
       - ./src:/var/www/html  # ホストのsrcフォルダをコンテナのWeb公開ディレクトリにマウント
