@@ -1,9 +1,6 @@
 <?php
 session_start();
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 if(empty($_SESSION['token'])) {
     $_SESSION['token'] = bin2hex(random_bytes(32));
 }
@@ -48,32 +45,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $dsn = 'mysql:host=db;dbname=formdb;charset=utf8mb4';
-        $db_user = 'user';
-        $db_pass = 'userpass';
-
-        try {
-            $pdo = new PDO($dsn, $db_user, $db_pass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ]);
-
-            $stmt = $pdo->prepare(
-                "INSERT INTO contacts (name, email, inquiry) VALUES (?, ?, ?)"
-            );
-            $stmt->execute([$name, $email, $inquiry]);
-
-            $message = 'お問い合わせを受け付け、DBに保存しました。<br>'
-                     . 'お名前：' . htmlspecialchars($name) . '<br>'
-                     . 'メールアドレス：' . htmlspecialchars($email) . '<br>'
-                     . '内容：<br>' . nl2br(htmlspecialchars($inquiry));
-
-            // 登録後、フォーム欄の値リセット
-            $name = $email = $inquiry = '';
-            $_SESSION['token'] = bin2hex(random_bytes(32));
-        } catch (PDOException $e) {
-            $errors[] = 'データベースエラー: ' . htmlspecialchars($e->getMessage());
-        }
+        $_SESSION['formdata']=[
+            'name' => $name,
+            'email' => $email,
+            'inquiry' => $inquiry,
+        ];
+        header('Location: contact_confirm.php');
+        exit();
     } else {
         $_SESSION['token'] = bin2hex(random_bytes(32));
     }
