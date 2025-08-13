@@ -45,6 +45,56 @@ function validateContact(array $data, bool $requireAll = true): array {
     return $errors;
 }
 
+// DB操作関数群（DI対応）
+function getContactById(PDO $pdo, int $id): ?array {
+    $st = $pdo->prepare('SELECT * FROM contacts WHERE id=?');
+    $st->execute([$id]);
+    return $st->fetch() ?: null;
+}
+
+function getContacts(PDO $pdo): array {
+    $st = $pdo->query('SELECT * FROM contacts ORDER BY created_at DESC LIMIT 100');
+    return $st->fetchAll();
+}
+
+function insertContact(PDO $pdo, array $input): int {
+    $st = $pdo->prepare('INSERT INTO contacts (name,email,inquiry) VALUES (?,?,?)');
+    $st->execute([
+        trim($input['name']),
+        trim($input['email']),
+        trim($input['inquiry'])
+    ]);
+    return (int)$pdo->lastInsertId();
+}
+
+function updateContact(PDO $pdo, int $id, array $input): void {
+    $st = $pdo->prepare('UPDATE contacts SET name=?, email=?, inquiry=? WHERE id=?');
+    $st->execute([
+        trim($input['name']),
+        trim($input['email']),
+        trim($input['inquiry']),
+        $id
+    ]);
+}
+
+function patchContact(PDO $pdo, int $id, array $input): void {
+    $fields = []; $params = [];
+    foreach (['name','email','inquiry'] as $f) {
+        if (array_key_exists($f, $input)) { $fields[] = "$f=?"; $params[] = trim($input[$f]); }
+    }
+    if (!$fields) respond(400, ['status'=>'error','message'=>'no updatable fields']);
+    $params[] = $id;
+    $sql = 'UPDATE contacts SET '.implode(', ', $fields).' WHERE id=?';
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
+}
+
+function deleteContact(PDO $pdo, int $id): void {
+    $st = $pdo->prepare('DELETE FROM contacts WHERE id=?');
+    $st->execute([$id]);
+    if ($st->rowCount() === 0) respond(404, ['status'=>'error','message'=>'Not found']);
+}
+
 $pdo    = pdo();
 $method = $_SERVER['REQUEST_METHOD'];
 $id     = isset($_GET['id']) && ctype_digit($_GET['id']) ? (int)$_GET['id'] : null;
@@ -53,16 +103,11 @@ try {
     switch ($method) {
         case 'GET':
             if ($id !== null) {
-                // 1件取得
-                $st = $pdo->prepare('SELECT * FROM contacts WHERE id=?');
-                $st->execute([$id]);
-                $row = $st->fetch();
+                $row = getContactById($pdo, $id);
                 if (!$row) respond(404, ['status'=>'error','message'=>'Not found']);
                 respond(200, ['status'=>'ok','data'=>$row]);
             } else {
-                // 一覧取得
-                $st = $pdo->query('SELECT * FROM contacts ORDER BY created_at DESC LIMIT 100');
-                $rows = $st->fetchAll();
+                $rows = getContacts($pdo);
                 respond(200, ['status'=>'ok', 'count'=>count($rows), 'data'=>$rows]);
             }
             break;
@@ -71,9 +116,7 @@ try {
             $input  = getJsonInput();
             $errors = validateContact($input, true);
             if ($errors) respond(400, ['status'=>'error','errors'=>$errors]);
-            $st = $pdo->prepare('INSERT INTO contacts (name,email,inquiry) VALUES (?,?,?)');
-            $st->execute([trim($input['name']), trim($input['email']), trim($input['inquiry'])]);
-            $newId = (int)$pdo->lastInsertId();
+            $newId = insertContact($pdo, $input);
             header('Location: /api/contacts.php?id='.$newId);
             respond(201, ['status'=>'ok','id'=>$newId]);
             break;
@@ -87,32 +130,20 @@ try {
             if ($errors) respond(400, ['status'=>'error','errors'=>$errors]);
 
             if ($method === 'PUT') {
-                $st = $pdo->prepare('UPDATE contacts SET name=?, email=?, inquiry=? WHERE id=?');
-                $st->execute([trim($input['name']), trim($input['email']), trim($input['inquiry']), $id]);
-            } else { // PATCH（部分更新）
-                $fields = []; $params = [];
-                foreach (['name','email','inquiry'] as $f) {
-                    if (array_key_exists($f, $input)) { $fields[] = "$f=?"; $params[] = trim($input[$f]); }
-                }
-                if (!$fields) respond(400, ['status'=>'error','message'=>'no updatable fields']);
-                $params[] = $id;
-                $sql = 'UPDATE contacts SET '.implode(', ', $fields).' WHERE id=?';
-                $st = $pdo->prepare($sql);
-                $st->execute($params);
+                updateContact($pdo, $id, $input);
+            } else {
+                patchContact($pdo, $id, $input);
             }
-            if ($st->rowCount() === 0) {
-                $chk = $pdo->prepare('SELECT 1 FROM contacts WHERE id=?');
-                $chk->execute([$id]);
-                if (!$chk->fetchColumn()) respond(404, ['status'=>'error','message'=>'Not found']);
-            }
+            // 更新件数チェック
+            $chk = $pdo->prepare('SELECT 1 FROM contacts WHERE id=?');
+            $chk->execute([$id]);
+            if (!$chk->fetchColumn()) respond(404, ['status'=>'error','message'=>'Not found']);
             respond(200, ['status'=>'ok','id'=>$id]);
             break;
 
         case 'DELETE':
             if ($id === null) respond(400, ['status'=>'error','message'=>'id is required']);
-            $st = $pdo->prepare('DELETE FROM contacts WHERE id=?');
-            $st->execute([$id]);
-            if ($st->rowCount() === 0) respond(404, ['status'=>'error','message'=>'Not found']);
+            deleteContact($pdo, $id);
             http_response_code(204); exit;
             break;
 
