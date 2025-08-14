@@ -1,4 +1,50 @@
 <?php
+require_once __DIR__ . '/../vendor/autoload.php';
+use \Firebase\JWT\JWT;
+use \Firebase\JWT\Key;
+
+define('JWT_SECRET', 'your_jwt_secret_key');
+// Helper function to get Authorization header reliably
+function getAuthorizationHeader(): string {
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        return $_SERVER['HTTP_AUTHORIZATION'];
+    }
+    if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        return $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+    if (function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        if (isset($headers['Authorization'])) {
+            return $headers['Authorization'];
+        }
+        // Some servers use lowercase keys
+        foreach ($headers as $key => $value) {
+            if (strtolower($key) === 'authorization') {
+                return $value;
+            }
+        }
+    }
+    return '';
+}
+
+$authHeader = getAuthorizationHeader();
+if (preg_match('/^Bearer\s+(\S+)/', $authHeader, $m)) {
+    $jwt = $m[1];
+    try {
+        $payload = JWT::decode($jwt, new Key(JWT_SECRET, 'HS256'));
+    } catch (Exception $e) {
+        http_response_code(401);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        exit;
+    }
+} else {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+    exit;
+}
+
 // CORS（開発用。必要に応じて調整）
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
