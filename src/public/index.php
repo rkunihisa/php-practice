@@ -9,7 +9,7 @@ define('JWT_SECRET', 'your_jwt_secret_key');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = $_POST['user'] ?? '';
     $pass = $_POST['pass'] ?? '';
-    // 仮の認証（本番はDB等でチェック）
+    // 仮の認証（本番はDB等でチェックする）
     if ($user === 'test' && $pass === 'password') {
         $payload = [
             'user' => $user,
